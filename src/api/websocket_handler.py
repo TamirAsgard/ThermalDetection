@@ -63,10 +63,29 @@ class WebSocketManager:
                 # Get current reading
                 reading = self.thermal_processor.get_averaged_reading()
 
-                # Get latest detection data (this was missing!)
+                # Get latest detection data
                 detection_data = self.thermal_processor.get_latest_detection_data()
 
-                if reading and detection_data.get('face_detection'):
+                # Debug logging
+                self.logger.debug(f"Reading: {reading is not None}")
+                self.logger.debug(f"Detection data: {detection_data}")
+
+                # Check if we have valid detection data
+                has_face_detection = detection_data.get('face_detection') is not None
+
+                if reading and has_face_detection:
+                    # Get additional detection info
+                    detection_method = detection_data.get('detection_method', 'yolo11')
+
+                    # Get camera stats for FPS
+                    current_fps = 30.0
+                    try:
+                        if hasattr(self.thermal_processor, 'camera_manager'):
+                            stats = self.thermal_processor.camera_manager.get_frame_statistics()
+                            current_fps = stats.get('current_fps', 30.0)
+                    except Exception:
+                        pass
+
                     # Build complete message with detection data
                     message_data = {
                         "temperature": reading.avg_temperature,
@@ -79,43 +98,112 @@ class WebSocketManager:
                         "pixel_count": reading.pixel_count,
                         # Add frame dimensions
                         "frame_width": detection_data.get('frame_width', 640),
-                        "frame_height": detection_data.get('frame_height', 480)
+                        "frame_height": detection_data.get('frame_height', 480),
+                        # Add detection method and performance info
+                        "detection_method": detection_method,
+                        "fps": current_fps
                     }
 
                     # Add face detection data if available
                     face_detection = detection_data.get('face_detection')
                     if face_detection:
-                        message_data["face_detection"] = {
-                            "x": face_detection.x,
-                            "y": face_detection.y,
-                            "width": face_detection.width,
-                            "height": face_detection.height,
-                            "confidence": face_detection.confidence
-                        }
+                        # Handle both dict and object types
+                        if hasattr(face_detection, 'x'):  # Object with attributes
+                            message_data["face_detection"] = {
+                                "x": face_detection.x,
+                                "y": face_detection.y,
+                                "width": face_detection.width,
+                                "height": face_detection.height,
+                                "confidence": face_detection.confidence
+                            }
+                        elif isinstance(face_detection, dict):  # Dict format
+                            message_data["face_detection"] = face_detection
+                        else:
+                            self.logger.warning(f"Unknown face detection format: {type(face_detection)}")
 
                     # Add forehead detection data if available
                     forehead_detection = detection_data.get('forehead_detection')
                     if forehead_detection:
-                        message_data["forehead_detection"] = {
-                            "x": forehead_detection['x'],
-                            "y": forehead_detection['y'],
-                            "width": forehead_detection['width'],
-                            "height": forehead_detection['height'],
-                            "confidence": 0.9  # Derived confidence
-                        }
+                        if isinstance(forehead_detection, dict):
+                            message_data["forehead_detection"] = forehead_detection
+                        elif hasattr(forehead_detection, 'x'):  # Object with attributes
+                            message_data["forehead_detection"] = {
+                                "x": forehead_detection.x,
+                                "y": forehead_detection.y,
+                                "width": forehead_detection.width,
+                                "height": forehead_detection.height,
+                                "confidence": getattr(forehead_detection, 'confidence', 0.9)
+                            }
 
                     message = {
                         "type": "temperature_reading",
                         "data": message_data
                     }
+
+                    self.logger.debug(f"Sending temperature reading: {message_data['temperature']:.1f}°C")
+
+                # Check if we have face detection but no temperature reading
+                elif has_face_detection and not reading:
+                    # Send detection-only message (person detected but no valid temperature)
+                    face_detection = detection_data.get('face_detection')
+                    forehead_detection = detection_data.get('forehead_detection')
+
+                    message_data = {
+                        "timestamp": datetime.now().isoformat(),
+                        "person_detected": True,
+                        "temperature_available": False,
+                        "frame_width": detection_data.get('frame_width', 640),
+                        "frame_height": detection_data.get('frame_height', 480),
+                        "detection_method": detection_data.get('detection_method', 'yolo11'),
+                        "fps": 30.0
+                    }
+
+                    # Add detection data
+                    if face_detection:
+                        if hasattr(face_detection, 'x'):
+                            message_data["face_detection"] = {
+                                "x": face_detection.x,
+                                "y": face_detection.y,
+                                "width": face_detection.width,
+                                "height": face_detection.height,
+                                "confidence": face_detection.confidence
+                            }
+                        elif isinstance(face_detection, dict):
+                            message_data["face_detection"] = face_detection
+
+                    if forehead_detection and isinstance(forehead_detection, dict):
+                        message_data["forehead_detection"] = forehead_detection
+
+                    message = {
+                        "type": "detection_only",
+                        "data": message_data
+                    }
+
+                    self.logger.debug("Sending detection-only message")
+
                 else:
+                    # No detection message
+                    detection_method = 'yolo11'
+                    current_fps = 30.0
+
+                    try:
+                        if hasattr(self.thermal_processor, 'face_detector'):
+                            detection_info = self.thermal_processor.face_detector.get_detection_info()
+                            detection_method = detection_info.get('method', 'yolo11')
+                    except Exception:
+                        pass
+
                     message = {
                         "type": "no_detection",
                         "data": {
                             "timestamp": datetime.now().isoformat(),
-                            "person_detected": False
+                            "person_detected": False,
+                            "detection_method": detection_method,
+                            "fps": current_fps
                         }
                     }
+
+                    self.logger.debug("Sending no detection message")
 
                 await self.broadcast_message(json.dumps(message))
                 await asyncio.sleep(1 / 10)  # 10 Hz updates

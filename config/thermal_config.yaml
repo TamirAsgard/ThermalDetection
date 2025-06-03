@@ -15,7 +15,7 @@ camera:
   # Frame settings
   frame_width: 640             # Camera resolution width
   frame_height: 480            # Camera resolution height
-  fps: 30                      # Target frames per second
+  fps: 60                      # Target frames per second
 
   # Thermal camera type - supported models:
   # "AT300", "AT600", "generic", "webcam"

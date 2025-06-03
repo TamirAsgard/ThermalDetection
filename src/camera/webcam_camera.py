@@ -33,7 +33,7 @@ class WebcamCamera(BaseCameraInterface):
         self.camera_index = getattr(config.camera, 'rgb_camera_index', 0)
         self.frame_width = getattr(config.camera, 'frame_width', 640)
         self.frame_height = getattr(config.camera, 'frame_height', 480)
-        self.fps = getattr(config.camera, 'fps', 30)
+        self.fps = getattr(config.camera, 'fps', 60)
 
         # Detection data
         self.latest_faces = []
