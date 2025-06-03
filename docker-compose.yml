@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  
+  # Main thermal detection application
+  thermal-detection:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        - BUILD_TYPE=production
+        - PYTHON_VERSION=3.11
+    
+    image: thermal-detection:latest
+    container_name: thermal-detection-app
+    hostname: thermal-detection
+    restart: unless-stopped
+    
+    # Port mapping
+    ports:
+      - "8000:8000"     # Main API and dashboard port
+    
+    # Environment variables
+    environment:
+      - PYTHONUNBUFFERED=1
+      - THERMAL_CONFIG_PATH=/app/config/thermal_config.yaml
+      - THERMAL_LOG_LEVEL=INFO
+      - THERMAL_API_HOST=0.0.0.0
+      - THERMAL_API_PORT=8000
+      - THERMAL_DEMO_MODE=true
+    
+    # Volume mounts
+    volumes:
+      - ./config:/app/config:ro          # Configuration files (read-only)
+      - ./logs:/app/logs                  # Log files
+      - ./data:/app/data                  # Database and data files
+      - ./model:/app/model                # AI model files
+      - /dev:/dev                         # Device access for cameras
+    
+    # Device access for cameras (USB cameras)
+    devices:
+      - /dev/video0:/dev/video0           # Primary camera
+      # - /dev/video1:/dev/video1         # Uncomment for second camera
+    
+    # Network configuration
+    networks:
+      - thermal-network
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+# Network configuration
+networks:
+  thermal-network:
+    driver: bridge
