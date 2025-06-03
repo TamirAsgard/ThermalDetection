@@ -1,0 +1,286 @@
+# ============================================================================
+# Thermal Forehead Detection System Configuration
+# ============================================================================
+
+# Camera Configuration
+camera:
+  # Camera device indices (0 = first camera, 1 = second camera, etc.)
+  thermal_camera_index: 0      # Thermal camera device index
+  rgb_camera_index: 0          # RGB camera device index (for face detection)
+
+  # For laptop demo, use same camera for both:
+  # thermal_camera_index: 0
+  # rgb_camera_index: 0
+
+  # Frame settings
+  frame_width: 640             # Camera resolution width
+  frame_height: 480            # Camera resolution height
+  fps: 30                      # Target frames per second
+
+  # Thermal camera type - supported models:
+  # "AT300", "AT600", "generic", "webcam"
+  thermal_device_type: "webcam"  # Change to "AT300" or "AT600" for real thermal cameras
+
+  # Advanced camera settings
+  auto_exposure: true          # Enable automatic exposure
+  auto_white_balance: true     # Enable automatic white balance
+  buffer_size: 1               # Camera buffer size (1 = latest frame)
+
+# Face Detection Configuration
+detection:
+  # Face detection confidence threshold (0.0 - 1.0)
+  # Lower = more detections but potentially false positives
+  # Higher = fewer but more accurate detections
+  face_confidence_threshold: 0.7
+
+  # Forehead region as percentage of face height
+  forehead_region_ratio: 0.3   # 30% of face height for forehead
+
+  # Minimum face size in pixels (width x height)
+  min_face_size: 80            # Minimum 80x80 pixels
+  max_face_size: 500           # Maximum 500x500 pixels
+
+  # Face detection algorithm files
+  face_cascade_path: "haarcascade_frontalface_default.xml"
+  dnn_model_path: "opencv_face_detector_uint8.pb"
+  dnn_config_path: "opencv_face_detector.pbtxt"
+
+  # Detection algorithm: "cascade" or "dnn"
+  detection_method: "cascade"  # DNN is more accurate but slower
+
+  # Face tracking settings
+  enable_tracking: true        # Track faces between frames
+  tracking_timeout: 2.0        # Seconds before losing track
+
+  # Multi-face detection
+  max_faces: 3                 # Maximum number of faces to detect
+  closest_face_only: true      # Only process the closest/largest face
+
+# Temperature Measurement Configuration
+temperature:
+  # Temperature range limits (Celsius)
+  temp_min: 30.0               # Minimum valid temperature
+  temp_max: 45.0               # Maximum valid temperature
+
+  # Fever detection threshold
+  fever_threshold: 37.5        # Temperature above this is considered fever
+  high_fever_threshold: 39.0   # High fever threshold for alerts
+
+  # Calibration settings
+  calibration_offset: 0.0      # Manual temperature offset in Celsius
+  calibration_enabled: true    # Enable calibration corrections
+
+  # Temperature processing
+  smoothing_kernel_size: 5     # Gaussian blur kernel size for thermal data
+  averaging_samples: 10        # Number of readings to average
+  measurement_accuracy: 0.1    # Measurement precision in Celsius
+
+  # Ambient temperature compensation
+  ambient_temp_compensation: true
+  default_ambient_temp: 22.0   # Default room temperature
+
+  # Units: "celsius" or "fahrenheit"
+  temperature_unit: "celsius"
+
+# API Server Configuration
+api:
+  # Server settings
+  host: "127.0.0.1"           # Server host (0.0.0.0 for all interfaces)
+  port: 8000                  # Server port
+  debug: false                # Enable debug mode (set to true for development)
+
+  # CORS settings for web browsers
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+    - "http://localhost:8000"
+    - "http://127.0.0.1:8000"
+
+  # WebSocket configuration
+  websocket_enabled: true     # Enable real-time WebSocket updates
+  websocket_update_rate: 10   # Updates per second (Hz)
+  max_connections: 100        # Maximum concurrent connections
+
+  # API features
+  enable_video_stream: true   # Enable video streaming endpoints
+  enable_screenshots: true   # Enable screenshot capture
+  enable_recording: false    # Enable video recording
+
+  # Security settings
+  api_key_required: false     # Require API key for access
+  api_key: "your-secret-key"  # API key (change this!)
+  rate_limiting: true         # Enable rate limiting
+  max_requests_per_minute: 60
+
+# Logging Configuration
+logging:
+  # Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+
+  # Log file settings
+  log_to_file: true
+  log_file_path: "logs/thermal_system.log"
+  max_log_size_mb: 10         # Maximum log file size
+  log_backup_count: 5         # Number of backup log files
+
+  # Measurement logging for audit trail
+  log_measurements: true
+  measurement_log_path: "logs/measurements.log"
+
+  # Console logging
+  log_to_console: true
+  console_log_level: "INFO"
+
+# Alert System Configuration
+alerts:
+  # Enable/disable different alert types
+  enable_alerts: true
+
+  # Sound alerts
+  enable_sound_alerts: true
+  fever_sound_file: "sounds/fever_alert.wav"
+  normal_sound_file: "sounds/normal_beep.wav"
+
+  # Visual alerts
+  enable_visual_alerts: true
+  fever_alert_color: [255, 0, 0]    # Red color for fever (RGB)
+  normal_alert_color: [0, 255, 0]   # Green color for normal (RGB)
+
+  # Email notifications (requires SMTP setup)
+  enable_email_alerts: false
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  email_user: "your_email@gmail.com"
+  email_password: "your_app_password"
+  alert_recipients:
+    - "admin@yourcompany.com"
+    - "security@yourcompany.com"
+
+  # Webhook notifications
+  enable_webhook_alerts: false
+  webhook_url: "https://your-webhook-url.com/alerts"
+
+# Database Configuration
+database:
+  # Database type: "sqlite", "mysql", "postgresql"
+  type: "sqlite"
+
+  # SQLite settings (for simple deployment)
+  sqlite_path: "data/thermal_readings.db"
+
+  # MySQL/PostgreSQL settings (for production)
+  host: "localhost"
+  port: 3306
+  database: "thermal_detection"
+  username: "thermal_user"
+  password: "secure_password"
+
+  # Data retention
+  keep_readings_days: 90      # Days to keep measurement data
+  auto_cleanup: true          # Automatically delete old data
+
+# Performance Configuration
+performance:
+  # Processing optimization
+  use_gpu: false              # Use GPU acceleration if available
+  num_worker_threads: 2       # Number of processing threads
+
+  # Memory management
+  frame_buffer_size: 3        # Number of frames to buffer
+  max_memory_usage_mb: 500    # Maximum memory usage
+
+  # Processing intervals
+  process_every_nth_frame: 1  # Process every N frames (1 = every frame)
+
+  # Optimization flags
+  optimize_for_accuracy: true  # Optimize for accuracy vs speed
+  enable_face_tracking: true   # Use face tracking for performance
+
+# Calibration Configuration
+calibration:
+  # Auto-calibration settings
+  enable_auto_calibration: false
+  calibration_interval_hours: 24    # Hours between auto-calibrations
+
+  # Blackbody calibration
+  blackbody_temperature: 37.0       # Known reference temperature
+  blackbody_coordinates: [320, 240] # Pixel coordinates of blackbody
+
+  # Environmental compensation
+  use_ambient_compensation: true
+  ambient_sensor_enabled: false
+
+  # Calibration history
+  store_calibration_history: true
+  calibration_log_path: "data/calibration_history.json"
+
+# Development and Testing
+development:
+  # Demo mode settings
+  demo_mode: true             # Enable demo mode with simulated data
+  simulate_fever_chance: 0.1  # 10% chance to simulate fever in demo
+
+  # Testing features
+  save_test_images: false     # Save images for testing
+  test_image_path: "test_data/images/"
+
+  # Debug visualization
+  show_debug_info: true       # Show debug information on screen
+  draw_face_rectangles: true  # Draw face detection rectangles
+  draw_forehead_region: true  # Draw forehead region rectangles
+  show_temperature_overlay: true  # Show temperature as overlay
+
+  # Performance monitoring
+  show_fps_counter: true      # Show FPS counter
+  log_performance_stats: true # Log performance statistics
+
+# Hardware Integration
+hardware:
+  # External sensors
+  enable_ambient_sensor: false
+  ambient_sensor_type: "DHT22"      # Temperature/humidity sensor
+  ambient_sensor_pin: 4             # GPIO pin for sensor
+
+  # External displays
+  enable_external_display: false
+  display_type: "LCD1602"           # External LCD display
+  display_i2c_address: 0x27         # I2C address for display
+
+  # GPIO controls (Raspberry Pi)
+  enable_gpio_controls: false
+  status_led_pin: 18                # Status LED GPIO pin
+  buzzer_pin: 12                    # Buzzer GPIO pin
+
+  # Relay controls
+  enable_relay_control: false
+  relay_pin: 22                     # Relay GPIO pin
+  relay_trigger_on_fever: true      # Activate relay on fever detection
+
+# Backup and Recovery
+backup:
+  # Data backup settings
+  enable_automatic_backup: true
+  backup_interval_hours: 6          # Hours between backups
+  backup_location: "backups/"
+  max_backup_files: 10              # Maximum number of backup files
+
+  # Configuration backup
+  backup_config_changes: true
+  config_backup_path: "backups/config/"
+
+# System Information
+system:
+  # System identification
+  system_name: "Thermal Detection Station 1"
+  location: "Main Entrance"
+  operator: "Security Team"
+  installation_date: "2024-01-01"
+
+  # Compliance settings
+  data_privacy_mode: true           # Enable privacy compliance features
+  anonymize_data: false            # Remove identifying information
+  consent_required: false          # Require user consent
+
+  # Maintenance
+  maintenance_mode: false          # Enable maintenance mode
+  maintenance_message: "System under maintenance"
