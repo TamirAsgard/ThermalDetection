@@ -46,7 +46,7 @@ detection:
   dnn_config_path: "opencv_face_detector.pbtxt"
 
   # Detection algorithm: "cascade" or "dnn"
-  detection_method: "cascade"  # DNN is more accurate but slower
+  detection_method: "yolo11"
 
   # Face tracking settings
   enable_tracking: true        # Track faces between frames

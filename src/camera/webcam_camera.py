@@ -1,4 +1,5 @@
-from datetime import time, datetime
+import time
+from datetime import datetime
 
 import cv2
 import numpy as np
@@ -121,7 +122,7 @@ class WebcamCamera(BaseCameraInterface):
         return None
 
     async def get_rgb_frame(self) -> Optional[np.ndarray]:
-        """Get RGB frame from webcam"""
+        """Get RGB frame from webcam and run detection"""
         if not self.is_initialized or not self.cap:
             return None
 
@@ -134,6 +135,29 @@ class WebcamCamera(BaseCameraInterface):
 
             if ret and frame is not None:
                 self.frame_count += 1
+
+                # Run face detection in background to update detection data
+                if self.face_detector:
+                    try:
+                        start_time = time.time()
+
+                        # Perform detection
+                        faces, foreheads = self.face_detector.detect_faces_and_foreheads(
+                            frame, draw_detections=False  # Don't draw on the frame
+                        )
+
+                        detection_time = time.time() - start_time
+                        self._update_detection_stats(detection_time)
+
+                        # Store detection data
+                        self.latest_faces = faces
+                        self.latest_foreheads = foreheads
+
+                    except Exception as e:
+                        self.logger.error(f"Detection failed: {e}")
+                        self.latest_faces = []
+                        self.latest_foreheads = []
+
                 self.latest_frame = frame.copy()
                 return frame
             else:
@@ -252,7 +276,7 @@ class WebcamCamera(BaseCameraInterface):
         # Calculate FPS
         current_fps = 0
         if self.start_time:
-            elapsed = time.time() - self.start_time
+            elapsed = time.time() - self.start_time.timestamp()
             if elapsed > 0:
                 current_fps = self.frame_count / elapsed
 
@@ -440,7 +464,7 @@ class WebcamCamera(BaseCameraInterface):
         """Get camera performance statistics"""
         current_fps = 0
         if self.start_time:
-            elapsed = time.time() - self.start_time
+            elapsed = time.time() - self.start_time.timestamp()
             if elapsed > 0:
                 current_fps = self.frame_count / elapsed
 
@@ -448,7 +472,7 @@ class WebcamCamera(BaseCameraInterface):
             "current_fps": current_fps,
             "target_fps": self.fps,
             "frame_count": self.frame_count,
-            "uptime_seconds": time.time() - self.start_time if self.start_time else 0,
+            "uptime_seconds": time.time() - self.start_time.timestamp() if self.start_time else 0,
             "avg_detection_time": self.avg_detection_time,
             "detection_fps": 1.0 / max(self.avg_detection_time, 0.001) if self.avg_detection_time > 0 else 0,
             "has_detection_data": len(self.latest_faces) > 0

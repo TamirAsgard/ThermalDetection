@@ -50,25 +50,41 @@ class TemperatureAnalyzer:
             height=forehead_height
         )
 
+    def extract_forehead_region_from_coordinates(self, x: int, y: int, width: int, height: int) -> ForeheadRegion:
+        """Extract forehead region from given coordinates"""
+        return ForeheadRegion(
+            x=x,
+            y=y,
+            width=width,
+            height=height
+        )
+
     def calculate_temperature(self,
                               thermal_frame: np.ndarray,
                               forehead_region: ForeheadRegion) -> Optional[TemperatureReading]:
         """Calculate temperature from thermal data"""
         try:
+            # Ensure coordinates are within frame bounds
+            h, w = thermal_frame.shape[:2]
+            x = max(0, min(forehead_region.x, w - 1))
+            y = max(0, min(forehead_region.y, h - 1))
+            x2 = max(0, min(x + forehead_region.width, w))
+            y2 = max(0, min(y + forehead_region.height, h))
+
             # Extract forehead region from thermal frame
-            roi = thermal_frame[
-                  forehead_region.y:forehead_region.y + forehead_region.height,
-                  forehead_region.x:forehead_region.x + forehead_region.width
-                  ]
+            roi = thermal_frame[y:y2, x:x2]
 
             if roi.size == 0:
                 return None
 
             # Apply smoothing filter
+            kernel_size = max(1, min(self.config.temperature.smoothing_kernel_size, min(roi.shape) // 2))
+            if kernel_size % 2 == 0:
+                kernel_size += 1  # Ensure odd kernel size
+
             roi_smooth = cv2.GaussianBlur(
                 roi,
-                (self.config.temperature.smoothing_kernel_size,
-                 self.config.temperature.smoothing_kernel_size),
+                (kernel_size, kernel_size),
                 0
             )
 

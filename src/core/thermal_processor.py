@@ -1,10 +1,9 @@
 import asyncio
-import numpy as np
-from typing import Optional, List
+from typing import Optional
 import logging
 from datetime import datetime
 
-from .face_detector import FaceDetector, FaceDetection
+from .face_detector import FaceDetector
 from .temperature_analyzer import TemperatureAnalyzer, TemperatureReading
 
 
@@ -23,6 +22,9 @@ class ThermalProcessor:
         self.last_reading = None
         self.reading_history = []
         self.latest_detection_data = {}
+
+        # Fever threshold
+        self.fever_threshold = config.temperature.fever_threshold
 
     async def start_processing(self):
         """Start the processing pipeline"""
@@ -45,18 +47,21 @@ class ThermalProcessor:
         # Get RGB frame for face detection
         rgb_frame = await self.camera_manager.get_rgb_frame()
         if rgb_frame is None:
+            self.latest_detection_data = {}
             return None
 
         # Get thermal frame
         thermal_frame = await self.camera_manager.get_thermal_frame()
         if thermal_frame is None:
+            self.latest_detection_data = {}
             return None
 
         # Store frame dimensions
         frame_height, frame_width = rgb_frame.shape[:2]
 
-        # Detect faces
-        faces = self.face_detector.detect_faces(rgb_frame)
+        # Detect faces and foreheads using the updated method
+        faces, foreheads = self.face_detector.detect_faces_and_foreheads(rgb_frame, draw_detections=False)
+
         if not faces:
             self.latest_detection_data = {
                 'frame_width': frame_width,
@@ -66,26 +71,41 @@ class ThermalProcessor:
             }
             return None
 
-        # Get closest face
-        closest_face = self.face_detector.get_closest_face(faces)
-        if not closest_face:
+        # Get best face and corresponding forehead
+        best_face, best_forehead = self.face_detector.get_best_face_and_forehead(faces, foreheads)
+
+        if not best_face:
+            self.latest_detection_data = {
+                'frame_width': frame_width,
+                'frame_height': frame_height,
+                'face_detection': None,
+                'forehead_detection': None
+            }
             return None
 
-        # Extract forehead region
-        forehead_region = self.temperature_analyzer.extract_forehead_region(closest_face)
-
-        # Store detection data
+        # Store detection data with proper structure
         self.latest_detection_data = {
             'frame_width': frame_width,
             'frame_height': frame_height,
-            'face_detection': closest_face,
+            'face_detection': best_face,  # This is a FaceDetection object
             'forehead_detection': {
-                'x': forehead_region.x,
-                'y': forehead_region.y,
-                'width': forehead_region.width,
-                'height': forehead_region.height
+                'x': best_forehead.x if best_forehead else best_face.x,
+                'y': best_forehead.y if best_forehead else best_face.y + int(best_face.height * 0.1),
+                'width': best_forehead.width if best_forehead else int(best_face.width * 0.8),
+                'height': best_forehead.height if best_forehead else int(best_face.height * 0.3),
+                'confidence': best_forehead.confidence if best_forehead else best_face.confidence * 0.9
             }
         }
+
+        # Extract forehead region for temperature calculation
+        if best_forehead:
+            # Use the forehead detection directly
+            forehead_region = self.temperature_analyzer.extract_forehead_region_from_coordinates(
+                best_forehead.x, best_forehead.y, best_forehead.width, best_forehead.height
+            )
+        else:
+            # Fallback to extracting from face
+            forehead_region = self.temperature_analyzer.extract_forehead_region(best_face)
 
         # Calculate temperature
         temperature_reading = self.temperature_analyzer.calculate_temperature(
@@ -93,7 +113,6 @@ class ThermalProcessor:
         )
 
         return temperature_reading
-
 
     def _update_history(self, reading: TemperatureReading):
         """Update reading history for averaging"""

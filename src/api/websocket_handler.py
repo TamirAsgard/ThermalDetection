@@ -63,19 +63,50 @@ class WebSocketManager:
                 # Get current reading
                 reading = self.thermal_processor.get_averaged_reading()
 
-                if reading:
+                # Get latest detection data (this was missing!)
+                detection_data = self.thermal_processor.get_latest_detection_data()
+
+                if reading and detection_data.get('face_detection'):
+                    # Build complete message with detection data
+                    message_data = {
+                        "temperature": reading.avg_temperature,
+                        "max_temperature": reading.max_temperature,
+                        "min_temperature": reading.min_temperature,
+                        "confidence": reading.confidence,
+                        "is_fever": reading.is_fever,
+                        "timestamp": reading.timestamp.isoformat(),
+                        "person_detected": True,
+                        "pixel_count": reading.pixel_count,
+                        # Add frame dimensions
+                        "frame_width": detection_data.get('frame_width', 640),
+                        "frame_height": detection_data.get('frame_height', 480)
+                    }
+
+                    # Add face detection data if available
+                    face_detection = detection_data.get('face_detection')
+                    if face_detection:
+                        message_data["face_detection"] = {
+                            "x": face_detection.x,
+                            "y": face_detection.y,
+                            "width": face_detection.width,
+                            "height": face_detection.height,
+                            "confidence": face_detection.confidence
+                        }
+
+                    # Add forehead detection data if available
+                    forehead_detection = detection_data.get('forehead_detection')
+                    if forehead_detection:
+                        message_data["forehead_detection"] = {
+                            "x": forehead_detection['x'],
+                            "y": forehead_detection['y'],
+                            "width": forehead_detection['width'],
+                            "height": forehead_detection['height'],
+                            "confidence": 0.9  # Derived confidence
+                        }
+
                     message = {
                         "type": "temperature_reading",
-                        "data": {
-                            "temperature": reading.avg_temperature,
-                            "max_temperature": reading.max_temperature,
-                            "min_temperature": reading.min_temperature,
-                            "confidence": reading.confidence,
-                            "is_fever": reading.is_fever,
-                            "timestamp": reading.timestamp.isoformat(),
-                            "person_detected": True,
-                            "pixel_count": reading.pixel_count
-                        }
+                        "data": message_data
                     }
                 else:
                     message = {
